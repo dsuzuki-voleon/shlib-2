@@ -33,6 +33,7 @@ try: # python3
     from collections.abc import Iterable
 except ImportError: # python2
     from collections import Iterable
+import shlex
 try:
     from shlex import quote
 except ImportError:
@@ -52,7 +53,6 @@ import shutil
 import errno
 import os
 import subprocess
-import shlex
 import inform
 from six import string_types
 
@@ -388,6 +388,7 @@ def ls(*paths, **kwargs):
     hidden = kwargs.get('hidden')
 
     def acceptable(path):
+        """Test if path is acceptable, returns True or False"""
         if only == 'file' and not path.is_file():
             return False
         if only == 'dir' and not path.is_dir():
