@@ -16,14 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see [http://www.gnu.org/licenses/].
 
+"""pathlib -- extends system pathlib"""
+
 __version__ = '0.4.0'
 
 # Imports {{{1
 from pathlib import Path, PosixPath
 import codecs
-import six
 import os
 import sys
+import six
 
 
 # is_readable {{{1

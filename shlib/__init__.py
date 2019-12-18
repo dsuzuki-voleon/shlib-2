@@ -1,3 +1,5 @@
+"""A light-weight package with few dependencies that allows users to do
+shell-script like things relatively easily in Python"""
 __version__ = '1.1.0'
 __released__ = '2019-03-21'
 
