@@ -5,7 +5,7 @@ import pytest
 def test_cp_real_downturn():
     """copy existing file to new file"""
     # setup
-    f1 = to_path('f1')
+    f1 = to_path('tests/SRCFILE')
     f2 = to_path('f2')
 
     # run test
