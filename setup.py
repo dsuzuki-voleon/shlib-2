@@ -24,6 +24,7 @@ setup(
     ],
     setup_requires=[
         'pytest-runner>=2.0',
+        'docstring',
     ],
     tests_require=['pytest', 'inform'],
     keywords=[
