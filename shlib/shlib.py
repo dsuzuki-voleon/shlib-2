@@ -29,16 +29,31 @@ try:
     from .extended_pathlib import Path
 except ImportError:
     from pathlib import Path
-import collections
 try: # python3
     from collections.abc import Iterable
 except ImportError: # python2
     from collections import Iterable
-
+try:
+    from shlex import quote
+except ImportError:
+    try:
+        from pipes import quote
+        import re
+    except ImportError:
+        def quote(arg):
+            """Custom quote function"""
+            if not arg:
+                return "''"
+            if re.search(r'[^\w@%+=:,./-]', arg, re.ASCII) is None:
+                return arg
+            return "'" + arg.replace("'", "'\"'\"'") + "'"
 import itertools
 import shutil
 import errno
 import os
+import subprocess
+import shlex
+import inform
 from six import string_types
 
 # Parameters {{{1
@@ -101,32 +116,19 @@ def raise_os_error(errno, filename=None):
     """Raise an OSError"""
     if filename:
         raise OSError(errno, os.strerror(errno), str(filename))
-    if filename == None:
+    if filename is None:
         raise OSError(errno, os.strerror(errno))
 
 
 # split_cmd {{{2
 def split_cmd(cmd):
-    from shlex import split
-    return split(cmd)
+    """Split a command."""
+    return shlex.split(cmd)
 
 
 # quote_arg {{{2
 def quote_arg(arg):
     """Return a shell-escaped version of the string *arg*."""
-    try:
-        from shlex import quote
-    except ImportError:
-        try:
-            from pipes import quote
-            import re
-        except ImportError:
-            def quote(arg):
-                if not arg:
-                    return "''"
-                if re.search(r'[^\w@%+=:,./-]', arg, re.ASCII) is None:
-                    return arg
-                return "'" + arg.replace("'", "'\"'\"'") + "'"
     return quote(str(arg))
 
 
@@ -156,9 +158,11 @@ def set_prefs(**kwargs):
 
 # SHLib state
 def get_state():
+    """Get the SHLib state"""
     return PREFERENCES
 
 def set_state(state):
+    """Set the SHLib state"""
     global PREFERENCES
     old_state = PREFERENCES
     PREFERENCES = state
@@ -204,9 +208,8 @@ def mv(*paths):
             # required because dest cannot exist with shutil.move
             shutil.move(to_str(src), to_str(fulldest))
         return
-    else:
-        if len(srcs) > 1:
-            raise_os_error(errno.ENOTDIR, dest)
+    if len(srcs) > 1:
+        raise_os_error(errno.ENOTDIR, dest)
     src = srcs[0]
     if dest.is_file():
         if src.is_dir():
@@ -277,7 +280,7 @@ def mkdir(*paths):
 
 # mount/umount {{{2
 class mount:
-
+    """Class to handle OS mounts"""
     def __init__(self, path):
         self.path = to_path(path)
         self.mounted_externally = is_mounted(self.path)
@@ -293,15 +296,18 @@ class mount:
             umount(self.path)
 
 def umount(path):
+    """Unmount"""
     Run(['umount', path])
 
 
 def is_mounted(path):
+    """Return True if currently mounted."""
     return Run(['mountpoint', '-q', path], '0,1').status == 0
 
 
 # cd {{{2
 class cd:
+    """Change directory"""
     def __init__(self, path):
         self.starting_dir = cwd()
         os.chdir(to_str(path))
@@ -607,7 +613,6 @@ class Cmd(object):
         is not be applied.  If you don't want to wait, call start() instead.
         """
         self.stdin = stdin
-        import subprocess
 
         if is_str(self.cmd):
             cmd = self.cmd if self.use_shell else split_cmd(self.cmd)
@@ -616,8 +621,7 @@ class Cmd(object):
             # this is particularly problematic the duplicity arguments in embalm
             cmd = [str(c) for c in self.cmd]
         if _use_log(self.log):
-            from inform import log
-            log('running:', render_command(cmd, option_args=self.option_args))
+            inform.log('running:', render_command(cmd, option_args=self.option_args))
 
         # indicate streams to intercept
         streams = {}
@@ -637,14 +641,12 @@ class Cmd(object):
             )
         except OSError as e:
             if PREFERENCES['use_inform']:
-                from inform import Error, os_error
-                raise Error(
-                    msg=os_error(e),
+                raise inform.Error(
+                    msg=inform.os_error(e),
                     cmd=render_command(self.cmd),
                     template='{msg}'
                 )
-            else:
-                raise
+            raise
 
         # store needed information and wait for termination if desired
         self.pid = process.pid
@@ -661,15 +663,13 @@ class Cmd(object):
         made to stdin of the command.
         """
         self.stdin = None
-        import subprocess
 
         if is_str(self.cmd):
             cmd = self.cmd if self.use_shell else split_cmd(self.cmd)
         else:
             cmd = self.cmd
         if _use_log(self.log):
-            from inform import log
-            log('running:', render_command(cmd, option_args=self.option_args))
+            inform.log('running:', render_command(cmd, option_args=self.option_args))
 
         if self.save_stdout or self.save_stderr:
             try:
@@ -718,8 +718,7 @@ class Cmd(object):
         self.status = process.returncode
 
         if _use_log(self.log):
-            from inform import log
-            log('exit status:', self.status)
+            inform.log('exit status:', self.status)
 
         # check return code
         if self.accept.unacceptable(self.status):
@@ -728,8 +727,7 @@ class Cmd(object):
             else:
                 msg = 'unexpected exit status (%d)' % self.status
             if PREFERENCES['use_inform']:
-                from inform import Error
-                raise Error(
+                raise inform.Error(
                     msg=msg,
                     status=self.status,
                     stdout=self.stdout.rstrip() if self.stdout else None,
@@ -737,12 +735,12 @@ class Cmd(object):
                     cmd=render_command(self.cmd),
                     template='{msg}'
                 )
-            else:
-                raise OSError(None, msg)
+            raise OSError(None, msg)
         return self.status
 
     # kill {{{3
     def kill(self):
+        """Kill process"""
         self.process.kill()
         self.process.wait()
 
@@ -750,8 +748,7 @@ class Cmd(object):
     def __str__(self):
         if is_str(self.cmd):
             return self.cmd
-        else:
-            return ' '.join(str(c) for c in self.cmd)
+        return ' '.join(str(c) for c in self.cmd)
 
 
 # Run class {{{2
@@ -867,23 +864,21 @@ class _Accept(object):
                 except ValueError:
                     if accept:
                         raise AssertionError('invalid modes string')
-                    else:
-                        accept = 0
+                    accept = 0
         self.accept = accept
 
     def unacceptable(self, status):
+        """Return False if exit code is unacceptable"""
         if self.accept is True:
             return False
-        elif type(self.accept) is tuple:
+        if type(self.accept) is tuple:
             return status not in self.accept
-        else:
-            return status < 0 or status > self.accept
+        return status < 0 or status > self.accept
 
 
 # run (deprecated) {{{2
 def run(cmd, stdin=None, accept=0, shell=False):
     "Run a command without capturing its output."
-    import subprocess
 
     # I have never been able to get Popen to work properly if cmd is not
     # a string when using the shell
@@ -912,7 +907,6 @@ def sh(cmd, stdin=None, accept=0, shell=True):
 # bg (deprecated) {{{2
 def bg(cmd, stdin=None, shell=False):
     "Execute a command in the background without capturing its output."
-    import subprocess
     streams = {'stdin': subprocess.PIPE} if stdin is not None else {}
     process = subprocess.Popen(cmd, shell=shell, **streams)
     if stdin is not None:

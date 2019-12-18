@@ -152,7 +152,8 @@ disable=print-statement,
         unused-variable,
         too-many-arguments,
         redefined-outer-name,
-        too-many-lines
+        too-many-lines,
+        useless-object-inheritance
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
